@@ -1,4 +1,5 @@
 from Node import Node
+import threading
 
 
 def find_replacement(node):
@@ -18,6 +19,7 @@ class BinarySearchTree:
     def __init__(self):
         self.root = None
         self.size = 0
+        self.tree_lock = threading.Lock()
 
     def add(self, elem):
         if self.root is None:
