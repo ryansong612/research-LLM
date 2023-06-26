@@ -3,8 +3,16 @@ import requests
 import concurrent.futures
 
 # declaring global variables
-cs_map = {}
-subjects = {"cs": cs_map}
+subjects = {"cs": 2000,          # Computer Science
+            "physics": 1000,     # Physics
+            "math": 1000,        # Mathematics
+            "q-bio": 500,        # Quantitative Biology
+            "q-fin": 500,         # Quantitative Finance
+            "stat": 500,         # Statistics
+            "eess": 500,         # Electrical Engineering and Systems Science
+            "econ": 500}         # Economics
+
+subjects_map = {subject: {} for subject in subjects}
 
 
 def get_title(url):
@@ -32,15 +40,16 @@ def extract_article_links(url):
     return links
 
 
-def concurrent_populate(host, links, num_threads):
+def concurrent_populate(subject, host, links, num_threads):
     def process_link(link):
         if link.get('title') == "Abstract":
-            print("#", end="")
             sub_url = f"{host}{link.get('href')}"
             title = get_title(sub_url)
             abstract = get_abstract(sub_url)
             if (title is not None) and (abstract is not None):
-                cs_map[title] = abstract
+                subjects_map[subject][title] = abstract
+            print("#", end="")
+        return
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
         # Submit tasks to the executor using the process_link function
@@ -58,31 +67,29 @@ def concurrent_populate(host, links, num_threads):
 
 
 def main():
-    home = "https://export.arxiv.org/list/cs/pastweek"
-    subject = "cs"
-    url_host = home.replace("https://export.", "")
-    if url_host[0:5] == "arxiv":
-        host = "https://export.arxiv.org"
-    else:
-        exit(1)
-    for i in range(0, 2751, 250):
-        visiting = f"{home}?skip={i}&show=250"
-        print(f"Extracting abstracts of essays on: {visiting}")
-        concurrent_populate(host, extract_article_links(visiting), 250)
+    file = open("output/all.out", "w")
+    for subject in subjects:
+        home = f"https://export.arxiv.org/list/{subject}"
+        url_host = home.replace("https://export.", "")
+        if url_host[0:5] == "arxiv":
+            host = "https://export.arxiv.org"
+        else:
+            exit(1)
+        for i in range(0, subjects[subject], 500):
+            visiting = f"{home}?skip={i}&show=500"
+            print(f"Extracting abstracts of essays on: {visiting}")
+            concurrent_populate(subject, host, extract_article_links(visiting), 250)
 
-    print("--------------------------------- Crawling Complete ---------------------------------")
+        print("-------------------------------- Crawling Complete --------------------------------")
 
-    file = open("output/cs.out", "w")
-
-    for title in subjects[subject].keys():
-        file.write(f"Title: {title}\n")
-        file.write(f"{subjects[subject][title]}\n")
-        file.write("\n")
-        file.write("------------------------------------------------------------------------------")
-        file.write("\n\n")
+        for title in subjects_map[subject].keys():
+            file.write(f"Title: {title}\n")
+            file.write(f"{subjects_map[subject][title]}\n")
+            file.write("\n")
+            file.write("---------------------------------------------------------------------------")
+            file.write("\n\n")
 
     file.close()
-    return 1
 
 
 if __name__ == '__main__':
