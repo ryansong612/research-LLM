@@ -1,9 +1,10 @@
 from bs4 import BeautifulSoup
 import requests
 import concurrent.futures
+import json
 
 # declaring global variables
-subjects = {"cs": 2000,          # Computer Science
+subjects = {"cs": 2500,         # Computer Science
             "physics": 1000,     # Physics
             "math": 1000,        # Mathematics
             "q-bio": 500,        # Quantitative Biology
@@ -12,7 +13,7 @@ subjects = {"cs": 2000,          # Computer Science
             "eess": 500,         # Electrical Engineering and Systems Science
             "econ": 500}         # Economics
 
-subjects_map = {subject: {} for subject in subjects}
+subjects_map = {subject: [] for subject in subjects}
 
 
 def get_title(url):
@@ -43,11 +44,15 @@ def extract_article_links(url):
 def concurrent_populate(subject, host, links, num_threads):
     def process_link(link):
         if link.get('title') == "Abstract":
-            sub_url = f"{host}{link.get('href')}"
-            title = get_title(sub_url)
-            abstract = get_abstract(sub_url)
+            article_id = link.get('href')
+            sub_url = f"{host}{article_id}"
+            title = get_title(sub_url).lstrip("\n")
+            abstract = get_abstract(sub_url).lstrip("\nAbstract: ")
             if (title is not None) and (abstract is not None):
-                subjects_map[subject][title] = abstract
+                article = {'title': title,
+                           'abstract': abstract,
+                           'id': article_id.lstrip("/abs/")}
+                subjects_map[subject].append(article)
             print("#", end="")
         return
 
@@ -67,9 +72,11 @@ def concurrent_populate(subject, host, links, num_threads):
 
 
 def main():
-    file = open("output/all.out", "w")
+    year = 23
+    month = 5
     for subject in subjects:
-        home = f"https://export.arxiv.org/list/{subject}"
+        number = "{:02d}".format(month) if month >= 10 else "0{}".format(month)
+        home = f"https://export.arxiv.org/list/{subject}/{year}{number}"
         url_host = home.replace("https://export.", "")
         if url_host[0:5] == "arxiv":
             host = "https://export.arxiv.org"
@@ -80,16 +87,12 @@ def main():
             print(f"Extracting abstracts of essays on: {visiting}")
             concurrent_populate(subject, host, extract_article_links(visiting), 250)
 
-        print("-------------------------------- Crawling Complete --------------------------------")
+    print("-------------------------------- Crawling Complete --------------------------------")
 
-        for title in subjects_map[subject].keys():
-            file.write(f"Title: {title}\n")
-            file.write(f"{subjects_map[subject][title]}\n")
-            file.write("\n")
-            file.write("---------------------------------------------------------------------------")
-            file.write("\n\n")
+    json_object = json.dumps(subjects_map, indent=4)
 
-    file.close()
+    with open("/Users/ryansong612/Desktop/research-LLM/output/all.json", "w") as file:
+        file.write(json_object)
 
 
 if __name__ == '__main__':
